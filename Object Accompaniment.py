@@ -4,26 +4,29 @@ import numpy as np
 import cv2
 
 active_object_ID = 1
-model = YOLO("yolo11n.pt", task="detection")
+model = YOLO("yolo11n.pt")
 
 
 def detect_objects(frame,active_object_ID):
-    result = model.track(frame, conf=0.7, iou=0.5, tracker = "bytetrack.yaml")[0]
+    result = model.track(source = frame, conf=0.5, iou=0.5, show = False, persist=False)[0]
     num_objects = len(result.boxes.data)
-    if active_object_ID > num_objects:
-        active_object_ID = num_objects
-    
-    for box in result.boxes.data: 
-        x1, y1, x2, y2 = map(int, box[:4]) 
-        conf = round(float(box[5]), 2)  
-        cls = int(box[6]) 
-        class_name = model.names[int(cls)]
-        track_id = int(box[4])
-        draw_rectangle(frame, x1, y1, x2, y2, class_name, conf, track_id)
-        if active_object_ID == track_id:
-            calculate_center_of_the_frame(frame.shape[0], frame.shape[1])
-            calulate_center_of_the_object(x1, y1, x2, y2)
-            cv2.line(frame, calculate_center_of_the_frame(frame.shape[1], frame.shape[0]), calulate_center_of_the_object(x1, y1, x2, y2), color=(0, 255, 0), thickness=2)
+
+    if(len(result)<=0):
+        return frame
+    else:
+        for box in result.boxes.data: 
+            if len(box) < 7:
+                continue
+            x1, y1, x2, y2 = map(int, box[:4]) 
+            conf = round(float(box[5]), 2)  
+            class_name = model.names[int(box[6])]
+            track_id = int(box[4])
+            draw_rectangle(frame, x1, y1, x2, y2, class_name, conf, track_id)
+            cv2.putText(frame, f"Active object ID:{active_object_ID}", (frame.shape[0] - 150, 30), cv2.FONT_HERSHEY_DUPLEX, 1, (255, 255, 255))
+            if active_object_ID == track_id:
+                calculate_center_of_the_frame(frame.shape[0], frame.shape[1])
+                calulate_center_of_the_object(x1, y1, x2, y2)
+                cv2.line(frame, calculate_center_of_the_frame(frame.shape[1], frame.shape[0]), calulate_center_of_the_object(x1, y1, x2, y2), color=(0, 255, 0), thickness=2)
         
     return frame  
 
@@ -58,7 +61,8 @@ while True:
         break
     
     frame = detect_objects(frame, active_object_ID)
-
+    #result = model.track(source = frame, persist = False)
+    #anotate_frame = result[0].plot()
     cv2.imshow("Webcam!", frame)
     
     key = cv2.waitKey(1) 
