@@ -2,19 +2,20 @@
 from ultralytics import YOLO, ASSETS
 import numpy as np
 import cv2
+import serial 
 
 active_object_ID = 1
 model = YOLO("yolo11n.pt")
-
+ser = serial.Serial(port = 'COM7',baudrate= 9600)
 click_position = None
 last_object_position = None
 last_object_class = None
 
-def detect_objects(frame, active_object_coordinates):
+def detect_objects(frame):
     global last_object_position  
     global last_object_class
     global click_position
-    result = model.track(source=frame, conf=0.01, iou=0.5, show=False, persist=False)[0]
+    result = model.track(source=frame, conf=0.3, iou=0.5, show=False, persist=False)[0]
 
     if not hasattr(result.boxes, "data") or result.boxes.data is None or len(result.boxes.data) == 0:
         last_object_position = None 
@@ -43,7 +44,7 @@ def detect_objects(frame, active_object_coordinates):
         best_match = None
         for obj in detected_objects:
             obj_center = obj[2]
-            distance = calculate_ditance_between_objects(frame.shape[0], frame.shape[1], obj_center[0], obj_center[1])
+            distance = calculate_ditance_between_objects(last_object_position[0], last_object_position[1], obj_center[0], obj_center[1])
             if distance < min_distance and obj[1] == last_object_class:
                 min_distance = distance
                 best_match = obj
@@ -53,6 +54,7 @@ def detect_objects(frame, active_object_coordinates):
             last_object_position = center
             last_object_class = class_name
             draw_rectangle(frame, *bbox, class_name, 1.0, object_id)
+            cv2.line(frame, last_object_position, calculate_center_of_the_frame(frame.shape[1], frame.shape[0]), (0, 255, 0), 2)
                 
     else:
         if(click_position is not None):
@@ -72,6 +74,7 @@ def detect_objects(frame, active_object_coordinates):
                 last_object_position = center
                 last_object_class = class_name
                 draw_rectangle(frame, *bbox, class_name, 1.0, object_id)
+                cv2.line(frame, last_object_position, calculate_center_of_the_frame(frame.shape[1], frame.shape[0]), (0, 255, 0), 2)
             click_position = None
     
     cv2.putText(frame, f"Click {click_position}", (frame.shape[0] - 150, 30), cv2.FONT_HERSHEY_DUPLEX, 1, (255, 255, 255))
@@ -109,14 +112,17 @@ if not stream.isOpened():
 
 
 while True:
+
+    ser.write(b"Weee\n")
+    value = ser.readline()
+    read_str = str(value, 'UTF-8')
+    print(read_str)
     ret, frame = stream.read()
     if not ret:
         print("No more stream :(")
         break
     
-    frame = detect_objects(frame, active_object_ID)
-    #result = model.track(source = frame, persist = False)
-    #anotate_frame = result[0].plot()
+    frame = detect_objects(frame)
     cv2.imshow("Frame", frame)
     
     key = cv2.waitKey(1) 
